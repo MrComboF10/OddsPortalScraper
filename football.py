@@ -1,4 +1,5 @@
 import bs4
+import selenium
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -11,19 +12,21 @@ chrome_driver = webdriver.Chrome("C:\\Users\\pcost\\chromedriver_win32\\chromedr
 delay = 3  # delay to load page
 
 
-def scrap():
-    scrap_year(2018)
-
-
 # 2018-2019 -> year = 2018
 def scrap_year(year):
-    # num_pages = 8
-    # for i in range(1, num_pages + 1):
-    #     scrap_page(year, i)
-    scrap_page(year, 1)
+    games = []
+    num_pages = 8
+
+    for page in range(1, num_pages + 1):
+        games_page = scrap_page(year, page)
+        for game in games_page:
+            games.append(game)
+
+    return games
 
 
 def scrap_page(year, page):
+    games_page = []
     url = "https://www.oddsportal.com/soccer/england/premier-league-{}-{}/results/#/page/{}/".format(year, year + 1, page)
     chrome_driver.get(url)
     try:
@@ -37,8 +40,8 @@ def scrap_page(year, page):
     for tr in table.findAll("tr", {"class": ["odd deactivate", "deactivate"]}):
         game_right_url = tr.find("td", {"class": "name table-participant"}).find("a")["href"]
         game_url = "https://www.oddsportal.com" + game_right_url
-        scrap_game(game_url)
-        break
+        games_page.append(scrap_game(game_url))
+    return games_page
 
 
 def scrap_game(game_url):
@@ -46,8 +49,12 @@ def scrap_game(game_url):
         "HT": "",  # HomeTeam
         "AT": "",  # AwayTeam
 
+        "DAY": 0,    # Game day
+        "MONTH": 0,  # Game Month
+        "YEAR": 0,   # Game Year
+
         "FTHG": 0,  # Final_Time_Home_Goals
-        "FTAH": 0,  # Final_Time_Away_Goals
+        "FTAG": 0,  # Final_Time_Away_Goals
         "FHHG": 0,  # First_Half_Home_Goals
         "FHAG": 0,  # First_Half_Away_Goals
         "SHHG": 0,  # Second_Half_Home_Goals
@@ -113,19 +120,54 @@ def scrap_game(game_url):
     game["HT"] = teams_names[0]
     game["AT"] = teams_names[1]
 
+    # get game date
+    date_list = soup.find("div", id="col-content").find("p", class_="date").get_text().replace(",", " ").split()
+    try:
+        game["DAY"] = int(date_list[1])
+        game["MONTH"] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].index(date_list[2]) + 1
+        game["YEAR"] = int(date_list[3])
+    except ValueError:
+        print("Date not integer!")
+        game["DAY"] = 0
+        game["MONTH"] = 0
+        game["YEAR"] = 0
+
     # get number goals
     goals_soup = soup.find("div", id="event-status").find("p", {"class": "result"})
     final_goals_str_list = goals_soup.find("strong").get_text().split(":")
-    game["FTHG"] = int(final_goals_str_list[0])
-    game["FTAH"] = int(final_goals_str_list[1])
+
+    try:
+        game["FTHG"] = int(final_goals_str_list[0])
+    except ValueError:
+        print("Final time home goals not integer!")
+    try:
+        game["FTAG"] = int(final_goals_str_list[1])
+    except ValueError:
+        print("Final time away goals not integer!")
 
     half_goals_str_list = goals_soup.get_text()[goals_soup.get_text().find("(")+1:goals_soup.get_text().find(")")].split(", ")
     first_half_goals_str_list = half_goals_str_list[0].split(":")
     second_half_goals_str_list = half_goals_str_list[1].split(":")
-    game["FHHG"] = int(first_half_goals_str_list[0])
-    game["FHAG"] = int(first_half_goals_str_list[1])
-    game["SHHG"] = int(second_half_goals_str_list[0])
-    game["SHAG"] = int(second_half_goals_str_list[1])
+
+    try:
+        game["FHHG"] = int(first_half_goals_str_list[0])
+    except ValueError:
+        print("First half home goals")
+
+    try:
+        game["FHAG"] = int(first_half_goals_str_list[1])
+    except ValueError:
+        print("First half away goals")
+
+    try:
+        game["SHHG"] = int(second_half_goals_str_list[0])
+    except ValueError:
+        print("Second half home goals")
+
+    try:
+        game["SHAG"] = int(second_half_goals_str_list[1])
+    except ValueError:
+        print("Second half away goals")
 
     # get result odds
     # -> full time odds
@@ -136,38 +178,46 @@ def scrap_game(game_url):
     game["FTAO"] = result_odds_list[2]
 
     # -> first half odds
-    chrome_driver.find_element_by_link_text("1st Half").click()
     try:
-        myElem = WebDriverWait(chrome_driver, delay).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds result first half page is ready!")
+        chrome_driver.find_element_by_link_text("1st Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("1st half do not exist")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds result first half page is ready!")
 
-    except TimeoutException:
-        print("Loading odds result first half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+        except TimeoutException:
+            print("Loading odds result first half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
 
-    result_odds_list = scrap_average_values_list(soup)
+        result_odds_list = scrap_average_values_list(soup)
 
-    game["FHHO"] = result_odds_list[0]
-    game["FHDO"] = result_odds_list[1]
-    game["FHAO"] = result_odds_list[2]
+        game["FHHO"] = result_odds_list[0]
+        game["FHDO"] = result_odds_list[1]
+        game["FHAO"] = result_odds_list[2]
 
     # -> second half odds
-    chrome_driver.find_element_by_link_text("2nd Half").click()
     try:
-        myElem = WebDriverWait(chrome_driver, delay).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds result second half page is ready!")
+        chrome_driver.find_element_by_link_text("2nd Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("2nd half do not exist")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds result second half page is ready!")
 
-    except TimeoutException:
-        print("Loading odds result second half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+        except TimeoutException:
+            print("Loading odds result second half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
 
-    result_odds_list = scrap_average_values_list(soup)
+        result_odds_list = scrap_average_values_list(soup)
 
-    game["SHHO"] = result_odds_list[0]
-    game["SHDO"] = result_odds_list[1]
-    game["SHAO"] = result_odds_list[2]
+        game["SHHO"] = result_odds_list[0]
+        game["SHDO"] = result_odds_list[1]
+        game["SHAO"] = result_odds_list[2]
 
     # get goals odds
     # -> full time odds
@@ -181,28 +231,6 @@ def scrap_game(game_url):
     soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
     full_time_odds = scrap_odds_goals_part(soup)
 
-    # -> first half odds
-    chrome_driver.find_element_by_link_text("1st Half").click()
-    try:
-        myElem = WebDriverWait(chrome_driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds goals first half page is ready!")
-
-    except TimeoutException:
-        print("Loading odds goals first half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
-    first_half_odds = scrap_odds_goals_part(soup)
-
-    # -> second half odds
-    chrome_driver.find_element_by_link_text("2nd Half").click()
-    try:
-        myElem = WebDriverWait(chrome_driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds goals second half page is ready!")
-
-    except TimeoutException:
-        print("Loading odds goals second half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
-    second_half_odds = scrap_odds_goals_part(soup)
-
     game["FTO 0.5"] = full_time_odds["O_U 0.5"]["OVER"]
     game["FTU 0.5"] = full_time_odds["O_U 0.5"]["UNDER"]
     game["FTO 1.5"] = full_time_odds["O_U 1.5"]["OVER"]
@@ -212,19 +240,49 @@ def scrap_game(game_url):
     game["FTO 3.5"] = full_time_odds["O_U 3.5"]["OVER"]
     game["FTU 3.5"] = full_time_odds["O_U 3.5"]["UNDER"]
 
-    game["FHO 0.5"] = first_half_odds["O_U 0.5"]["OVER"]
-    game["FHU 0.5"] = first_half_odds["O_U 0.5"]["UNDER"]
-    game["FHO 1.5"] = first_half_odds["O_U 1.5"]["OVER"]
-    game["FHU 1.5"] = first_half_odds["O_U 1.5"]["UNDER"]
-    game["FHO 2.5"] = first_half_odds["O_U 2.5"]["OVER"]
-    game["FHU 2.5"] = first_half_odds["O_U 2.5"]["UNDER"]
+    # -> first half odds
+    try:
+        chrome_driver.find_element_by_link_text("1st Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("1st half do not exist")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds goals first half page is ready!")
 
-    game["SHO 0.5"] = second_half_odds["O_U 0.5"]["OVER"]
-    game["SHU 0.5"] = second_half_odds["O_U 0.5"]["UNDER"]
-    game["SHO 1.5"] = second_half_odds["O_U 1.5"]["OVER"]
-    game["SHU 1.5"] = second_half_odds["O_U 1.5"]["UNDER"]
-    game["SHO 2.5"] = second_half_odds["O_U 2.5"]["OVER"]
-    game["SHU 2.5"] = second_half_odds["O_U 2.5"]["UNDER"]
+        except TimeoutException:
+            print("Loading odds goals first half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+        first_half_odds = scrap_odds_goals_part(soup)
+
+        game["FHO 0.5"] = first_half_odds["O_U 0.5"]["OVER"]
+        game["FHU 0.5"] = first_half_odds["O_U 0.5"]["UNDER"]
+        game["FHO 1.5"] = first_half_odds["O_U 1.5"]["OVER"]
+        game["FHU 1.5"] = first_half_odds["O_U 1.5"]["UNDER"]
+        game["FHO 2.5"] = first_half_odds["O_U 2.5"]["OVER"]
+        game["FHU 2.5"] = first_half_odds["O_U 2.5"]["UNDER"]
+
+    # -> second half odds
+    try:
+        chrome_driver.find_element_by_link_text("2nd Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("2nd half do not exist")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds goals second half page is ready!")
+
+        except TimeoutException:
+            print("Loading odds goals second half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+        second_half_odds = scrap_odds_goals_part(soup)
+
+        game["SHO 0.5"] = second_half_odds["O_U 0.5"]["OVER"]
+        game["SHU 0.5"] = second_half_odds["O_U 0.5"]["UNDER"]
+        game["SHO 1.5"] = second_half_odds["O_U 1.5"]["OVER"]
+        game["SHU 1.5"] = second_half_odds["O_U 1.5"]["UNDER"]
+        game["SHO 2.5"] = second_half_odds["O_U 2.5"]["OVER"]
+        game["SHU 2.5"] = second_half_odds["O_U 2.5"]["UNDER"]
 
     # Draw no bet
     # -> full time odds
@@ -242,43 +300,57 @@ def scrap_game(game_url):
     game["FTNDA"] = draw_no_bet_odds_list[1]
 
     # first half odds
-    chrome_driver.find_element_by_link_text("1st Half").click()
     try:
-        myElem = WebDriverWait(chrome_driver, delay).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds no draw first half page is ready!")
+        chrome_driver.find_element_by_link_text("1st Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("1st half do not exist")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds no draw first half page is ready!")
 
-    except TimeoutException:
-        print("Loading odds no draw first half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+        except TimeoutException:
+            print("Loading odds no draw first half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
 
-    draw_no_bet_odds_list = scrap_average_values_list(soup)
-    game["FHNDH"] = draw_no_bet_odds_list[0]
-    game["FHNDA"] = draw_no_bet_odds_list[1]
+        draw_no_bet_odds_list = scrap_average_values_list(soup)
+        game["FHNDH"] = draw_no_bet_odds_list[0]
+        game["FHNDA"] = draw_no_bet_odds_list[1]
 
     # second half odds
-    chrome_driver.find_element_by_link_text("2nd Half").click()
     try:
-        myElem = WebDriverWait(chrome_driver, delay).until(
-            EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        print("Odds no draw second half page is ready!")
+        chrome_driver.find_element_by_link_text("2nd Half").click()
+    except selenium.common.exceptions.NoSuchElementException:
+        print("2nd half do not exist")
 
-    except TimeoutException:
-        print("Loading odds no draw second half page took too much time!")
-    soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+    else:
+        try:
+            myElem = WebDriverWait(chrome_driver, delay).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds no draw second half page is ready!")
 
-    draw_no_bet_odds_list = scrap_average_values_list(soup)
-    game["SHNDH"] = draw_no_bet_odds_list[0]
-    game["SHNDA"] = draw_no_bet_odds_list[1]
+        except TimeoutException:
+            print("Loading odds no draw second half page took too much time!")
+        soup = bs4.BeautifulSoup(chrome_driver.page_source, "html.parser")
+
+        draw_no_bet_odds_list = scrap_average_values_list(soup)
+        game["SHNDH"] = draw_no_bet_odds_list[0]
+        game["SHNDA"] = draw_no_bet_odds_list[1]
 
     print(game)
+    return list(game.values())
 
 
 def scrap_average_values_list(soup):
     result_odds_soup_list = soup.find("div", id="odds-data-table").find("div", {"class": "table-container"}).find("table").find("tfoot").find("tr", {"class": "aver"}).findAll("td", {"class": "right"})
     result_odds_list = []
     for odd_soup in result_odds_soup_list:
-        result_odds_list.append(float(odd_soup.get_text()))
+        try:
+            result_odds_list.append(float(odd_soup.get_text()))
+        except ValueError:
+            print("Average not real!")
+            result_odds_list.append(0)
     return result_odds_list
 
 
@@ -307,11 +379,47 @@ def scrap_odds_goals_part(soup):
 
 def scrap_odds_over_under(odds_goals_div):
     odds_over_under_span_list = odds_goals_div.findAll("span", class_="avg chunk-odd nowrp")
-    return {"OVER": float(odds_over_under_span_list[1].find("a").get_text()), "UNDER": float(odds_over_under_span_list[0].find("a").get_text())}
+    odds_dict = {"OVER": 0.0, "UNDER": 0.0}
+    try:
+        odds_dict = {
+            "OVER": float(odds_over_under_span_list[1].find("a").get_text()),
+            "UNDER": float(odds_over_under_span_list[0].find("a").get_text())
+        }
+    except ValueError:
+        print("Odds over/under not real!")
+    return odds_dict
 
 
-# def scrap_game_goals_odds(goals_odds_url):
+def create_wb(title, year):
+    games = scrap_year(year)
+
+    cols_names = [
+        "HT", "AT",
+        "DAY", "MONTH", "YEAR",
+        "FTHG", "FTAG", "FHHG", "FHAG", "SHHG", "SHAG",
+        "FTHO", "FTDO", "FTAO", "FHHO", "FHDO", "FHAO", "SHHO", "SHDO", "SHAO",
+        "FTO 0.5", "FTU 0.5", "FTO 1.5", "FTU 1.5", "FTO 2.5", "FTU 2.5", "FTO 3.5", "FTU 3.5",
+        "FHO 0.5", "FHU 0.5", "FHO 1.5", "FHU 1.5", "FHO 2.5", "FHU 2.5",
+        "SHO 0.5", "SHU 0.5", "SHO 1.5", "SHU 1.5", "SHO 2.5", "SHU 2.5",
+        "FTNDH", "FTNDA", "FHNDH", "FHNDA", "SHNDH", "SHNDA"
+    ]
+
+    wb = openpyxl.Workbook()
+
+    ws = wb.active
+    ws.title = title
+
+    current_col = 1
+    for name in cols_names:
+        ws.cell(row=1, column=current_col, value=name)
+        current_col += 1
+
+    for current_row in range(2, len(games) + 2):
+        for current_col in range(1, len(cols_names) + 1):
+            ws.cell(row=current_row, column=current_col, value=games[current_row - 2][current_col - 1])
+
+    wb.save("PremierLeague{}Odds.xlsx".format(title))
+    wb.close()
 
 
-
-scrap()
+create_wb("2018_2019", 2018)
