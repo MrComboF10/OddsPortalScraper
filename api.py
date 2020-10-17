@@ -8,26 +8,36 @@ from selenium.common.exceptions import TimeoutException
 import openpyxl
 
 
-chrome_driver = webdriver.Chrome("C:\\Users\\pcost\\chromedriver_win32\\chromedriver.exe")
-delay = 3  # delay to load page
+def start():
+    global chrome_driver, delay
+    chrome_driver = webdriver.Chrome("C:\\Users\\pcost\\chromedriver_win32\\chromedriver.exe")
+    delay = 3  # delay to load page
+
+
+def close():
+    chrome_driver.close()
+
+
+def scrap_league_seasons(country, league, start_year, last_year):
+    return [scrap_league_season(country, league, str(year) + "-" + str(year + 1)) for year in range(start_year, last_year + 1)]
 
 
 # 2018-2019 -> year = 2018
-def scrap_year(year):
-    games = []
+def scrap_league_season(country, league, year):
+    matches = []
     num_pages = 8
 
     for page in range(1, num_pages + 1):
-        games_page = scrap_page(year, page)
-        for game in games_page:
-            games.append(game)
+        matches_page = scrap_page(country, league, year, page)
+        for game in matches_page:
+            matches.append(game)
 
-    return games
+    return {"Year": year, "Matches": matches}
 
 
-def scrap_page(year, page):
+def scrap_page(country, league, year, page):
     games_page = []
-    url = "https://www.oddsportal.com/soccer/england/premier-league-{}-{}/results/#/page/{}/".format(year, year + 1, page)
+    url = "https://www.oddsportal.com/soccer/{}/{}-{}-{}/results/#/page/{}/".format(country, league, year, year + 1, page)
     chrome_driver.get(url)
     try:
         myElem = WebDriverWait(chrome_driver, delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-participant')))
