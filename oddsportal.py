@@ -40,7 +40,7 @@ class OddsPortal:
         self.__league = league
         self.__start_season_year = start_season_year
         self.__last_season_year = last_season_year
-        self.__wb_name = wb_name
+        self.__wb_name = wb_name + ".xlsx"
 
     def load_file(self):
 
@@ -51,7 +51,7 @@ class OddsPortal:
             self.__league = config["league"]
             self.__start_season_year = config["start_season_year"]
             self.__last_season_year = config["last_season_year"]
-            self.__wb_name = config["workbook_name"]
+            self.__wb_name = config["workbook_name"] + ".xlsx"
 
     def scrap_seasons(self):
         for year in range(self.__start_season_year, self.__last_season_year + 1):
@@ -418,38 +418,6 @@ class OddsPortal:
         except (ValueError, AttributeError):
             print("Failed scrapping odds over/under")
         return odds_dict
-
-
-    # def create_wb(title, year):
-    #     games = scrap_year(year)
-    #
-    #     cols_names = [
-    #         "HT", "AT",
-    #         "DAY", "MONTH", "YEAR",
-    #         "FTHG", "FTAG", "FHHG", "FHAG", "SHHG", "SHAG",
-    #         "FTHO", "FTDO", "FTAO", "FHHO", "FHDO", "FHAO", "SHHO", "SHDO", "SHAO",
-    #         "FTO 0.5", "FTU 0.5", "FTO 1.5", "FTU 1.5", "FTO 2.5", "FTU 2.5", "FTO 3.5", "FTU 3.5",
-    #         "FHO 0.5", "FHU 0.5", "FHO 1.5", "FHU 1.5", "FHO 2.5", "FHU 2.5",
-    #         "SHO 0.5", "SHU 0.5", "SHO 1.5", "SHU 1.5", "SHO 2.5", "SHU 2.5",
-    #         "FTNDH", "FTNDA", "FHNDH", "FHNDA", "SHNDH", "SHNDA"
-    #     ]
-    #
-    #     wb = openpyxl.Workbook()
-    #
-    #     ws = wb.active
-    #     ws.title = title
-    #
-    #     current_column = 1
-    #     for name in cols_names:
-    #         ws.cell(row=1, column=current_column, value=name)
-    #         current_column += 1
-    #
-    #     for current_row in range(2, len(games) + 2):
-    #         for current_column in range(1, len(cols_names) + 1):
-    #             ws.cell(row=current_row, column=current_column, value=games[current_row - 2][current_column - 1])
-    #
-    #     wb.save("PremierLeague{}Odds.xlsx".format(title))
-    #     wb.close()
 
     def create_wb(self):
 
