@@ -1,0 +1,15 @@
+{
+
+  "sport": "soccer",
+
+  "country": "england",
+
+  "league": "premier-league",
+
+  "start_season_year": 2018,
+
+  "last_season_year": 2019,
+
+  "workbook_name": "PremierLeague.xlsx"
+
+}
