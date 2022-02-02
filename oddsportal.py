@@ -18,29 +18,25 @@ class OddsPortal:
         self.__sport = ""
         self.__country = ""
         self.__league = ""
-        self.__start_season_year = 0  # 2018-2019 -> year = 2018
-        self.__last_season_year = 0  # 2019-2020 -> year = 2019
-        self.__wb_name = ""
+        self.__year = 0
 
-        self.__current_year = 0
-        self.__current_match = 1
-
-        self.__seasons = []
+        self.__ws_row = 2
 
         self.__chrome_driver = webdriver.Chrome("C:\\Users\\pcost\\chromedriver_win32\\chromedriver.exe")
         self.__delay = 10
-        self.__number_pages_season = 8
+
+        self.__wb = openpyxl.Workbook()
+        self.__ws = self.__wb.active
+        self.__ws.title = ""
 
     def close(self):
         self.__chrome_driver.close()
 
-    def load(self, sport, country, league, start_season_year, last_season_year, wb_name):
+    def load(self, sport, country, league, year):
         self.__sport = sport
         self.__country = country
         self.__league = league
-        self.__start_season_year = start_season_year
-        self.__last_season_year = last_season_year
-        self.__wb_name = wb_name + ".xlsx"
+        self.__year = year
 
     def load_file(self):
 
@@ -49,44 +45,58 @@ class OddsPortal:
             self.__sport = config["sport"]
             self.__country = config["country"]
             self.__league = config["league"]
-            self.__start_season_year = config["start_season_year"]
-            self.__last_season_year = config["last_season_year"]
-            self.__wb_name = config["workbook_name"] + ".xlsx"
+            self.__year = config["year"]
+            self.__ws.title = config["year"]
 
-    def scrap_seasons(self):
-        for year in range(self.__start_season_year, self.__last_season_year + 1):
-            self.__seasons.append(self.scrap_season(year))
-        return self.__seasons
+    def __create_ws_columns(self):
 
-    def scrap_season(self, year):
-        matches = []
+        cols_names = [
+            "HT", "AT",
+            "DAY", "MONTH", "YEAR",
+            "FTHG", "FTAG",
+            "FTHO", "FTDO", "FTAO",
+        ]
 
-        self.__current_year = year
-        self.__current_match = 0
+        col = 1
+        for name in cols_names:
+            if not (name == "FTDO" and self.__sport == "basketball"):  # basketball draws odds are not relevant
+                self.__ws.cell(row=1, column=col, value=name)
+            col += 1
 
-        for page in range(1, self.__number_pages_season + 1):
-            matches_page = self.__scrap_page(page)
-            for match in matches_page:
-                matches.append(match)
+    def scrap_season(self):
 
-        return {"Year": self.__current_year, "Matches": matches}
+        page = 1
+
+        while True:
+            if self.__scrap_page(page) == "END_OF_PAGES":
+                break
+            else:
+                page += 1
 
     def __scrap_page(self, page):
-        matches_page = []
-        url = "https://www.oddsportal.com/{}/{}/{}-{}-{}/results/#/page/{}/".format(self.__sport, self.__country, self.__league, self.__current_year, self.__current_year + 1, page)
+        url = "https://www.oddsportal.com/{}/{}/{}-{}-{}/results/#/page/{}/".format(self.__sport, self.__country, self.__league, self.__year, self.__year + 1, page)
         self.__chrome_driver.get(url)
         try:
-            myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-participant')))
+            myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-main')))
         except TimeoutException:
             print("Loading page took too much time!")
 
         soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
         table = soup.find("table", id="tournamentTable")
+
+        if self.__is_end_of_pages(table):
+            return "END_OF_PAGES"
+
         for tr in table.findAll("tr", {"class": ["odd deactivate", "deactivate"]}):
             match_right_url = tr.find("td", {"class": "name table-participant"}).find("a")["href"]
             match_url = "https://www.oddsportal.com" + match_right_url
-            matches_page.append(self.__scrap_match(match_url))
-        return matches_page
+            self.__scrap_match(match_url)
+
+        return "SUCCESS"
+
+    @staticmethod
+    def __is_end_of_pages(table):
+        return table.find(id="emptyMsg") is not None
 
     def __scrap_match(self, game_url):
         match = {
@@ -116,14 +126,24 @@ class OddsPortal:
 
         # get team names
         teams_names = soup.find("div", id="col-content").find("h1").get_text().split(" - ")
-        match["HT"] = teams_names[0]
-        match["AT"] = teams_names[1]
+        home_team = teams_names[0]
+        match["HT"] = home_team
+        self.__ws.cell(row=self.__ws_row, column="HT", value=home_team)
+        away_team = teams_names[1]
+        match["AT"] = away_team
+        self.__ws.cell(row=self.__ws_row, column="AT", value=away_team)
 
         # get match date
         date_list = soup.find("div", id="col-content").find("p", class_="date").get_text().replace(",", " ").split()
         try:
-            match["DAY"] = int(date_list[1])
-            match["MONTH"] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].index(date_list[2]) + 1
+            day = int(date_list[1])
+            match["DAY"] = day
+            self.__ws.cell(row=self.__ws_row, column="DAY", value=day)
+
+            month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].index(date_list[2]) + 1
+            match["MONTH"] = month
+            self.__ws.cell(row=self.__ws_row, column="MONTH", value=month)
+
             match["YEAR"] = int(date_list[3])
         except ValueError:
             print("Failed scrapping date")
