@@ -6,10 +6,10 @@
 
   "league": "premier-league",
 
-  "start_season_year": 2018,
+  "start_season_year": 2016,
 
-  "last_season_year": 2019,
+  "last_season_year": 2016,
 
-  "workbook_name": "PremierLeague"
+  "workbook_name": "PremierLeague2016"
 
 }

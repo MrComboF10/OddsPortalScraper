@@ -99,54 +99,10 @@ class OddsPortal:
 
             "FTHG": 0,  # Final_Time_Home_Goals
             "FTAG": 0,  # Final_Time_Away_Goals
-            "FHHG": 0,  # First_Half_Home_Goals
-            "FHAG": 0,  # First_Half_Away_Goals
-            "SHHG": 0,  # Second_Half_Home_Goals
-            "SHAG": 0,  # Second_Half_Away_Goals
 
             "FTHO": 0,  # Final_Time_Home_Team_Winning_Odd
             "FTDO": 0,  # Final_Time_Draw_Odd
             "FTAO": 0,  # Final_Time_Away_Team_Winning_Odd
-
-            "FHHO": 0,  # First_Half_Home_Team_Winning_Odd
-            "FHDO": 0,  # First_Half_Draw_Odd
-            "FHAO": 0,  # First_Half_Away_Team_Winning_Odd
-
-            "SHHO": 0,  # Second_Half_Home_Team_Winning_Odd
-            "SHDO": 0,  # Second_Half_Draw_Odd
-            "SHAO": 0,  # Second_Half_Away_Team_Winning_Odd
-
-            "FTO 0.5": 0,  # Final_Time_Over_0.5_Goals
-            "FTU 0.5": 0,  # Final_Time_Under_0.5_Goals
-            "FTO 1.5": 0,  # Final_Time_Over_1.5_Goals
-            "FTU 1.5": 0,  # Final_Time_Under_1.5_Goals
-            "FTO 2.5": 0,  # Final_Time_Over_2.5_Goals
-            "FTU 2.5": 0,  # Final_Time_Under_2.5_Goals
-            "FTO 3.5": 0,  # Final_Time_Over_3.5_Goals
-            "FTU 3.5": 0,  # Final_Time_Under_3.5_Goals
-
-            "FHO 0.5": 0,  # First_Half_Over_0.5_Goals
-            "FHU 0.5": 0,  # First_Half_Under_0.5_Goals
-            "FHO 1.5": 0,  # First_Half_Over_1.5_Goals
-            "FHU 1.5": 0,  # First_Half_Under_1.5_Goals
-            "FHO 2.5": 0,  # First_Half_Over_2.5_Goals
-            "FHU 2.5": 0,  # First_Half_Under_2.5_Goals
-
-            "SHO 0.5": 0,  # Second_Half_Over_0.5_Goals
-            "SHU 0.5": 0,  # Second_Half_Under_0.5_Goals
-            "SHO 1.5": 0,  # Second_Half_Over_1.5_Goals
-            "SHU 1.5": 0,  # Second_Half_Under_1.5_Goals
-            "SHO 2.5": 0,  # Second_Half_Over_2.5_Goals
-            "SHU 2.5": 0,  # Second_Half_Under_2.5_Goals
-
-            "FTNDH": 0,  # Final_Time_No_Draw_Home_Team_Winning_Odd
-            "FTNDA": 0,  # Final_Time_No_Draw_Away_Team_Winning_Odd
-
-            "FHNDH": 0,  # First_Half_No_Draw_Home_Team_Winning_Odd
-            "FHNDA": 0,  # First_Half_No_Draw_Away_Team_Winning_Odd
-
-            "SHNDH": 0,  # Second_Half_No_Draw_Home_Team_Winning_Odd
-            "SHNDA": 0   # Second_Half_No_Draw_Away_Team_Winning_Odd
         }
 
         self.__chrome_driver.get(game_url)
@@ -188,182 +144,12 @@ class OddsPortal:
         except ValueError:
             print("Failed scrapping final time away goals")
 
-        half_goals_str_list = goals_soup.get_text()[goals_soup.get_text().find("(")+1:goals_soup.get_text().find(")")].split(", ")
-        first_half_goals_str_list = half_goals_str_list[0].split(":")
-        second_half_goals_str_list = half_goals_str_list[1].split(":")
-
-        try:
-            match["FHHG"] = int(first_half_goals_str_list[0])
-        except ValueError:
-            print("Failed scrapping first half home goals")
-
-        try:
-            match["FHAG"] = int(first_half_goals_str_list[1])
-        except ValueError:
-            print("Failed scrapping first half away goals")
-
-        try:
-            match["SHHG"] = int(second_half_goals_str_list[0])
-        except ValueError:
-            print("Failed scrapping second half home goals")
-
-        try:
-            match["SHAG"] = int(second_half_goals_str_list[1])
-        except ValueError:
-            print("Failed scrapping second half away goals")
-
         # get result odds
-        # -> full time odds
         result_odds_list = self.__scrap_average_values_list(soup)
 
         match["FTHO"] = result_odds_list[0]
         match["FTDO"] = result_odds_list[1]
         match["FTAO"] = result_odds_list[2]
-
-        # -> first half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("1st Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("1st half do not exist")
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds result first half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-
-            result_odds_list = self.__scrap_average_values_list(soup)
-
-            match["FHHO"] = result_odds_list[0]
-            match["FHDO"] = result_odds_list[1]
-            match["FHAO"] = result_odds_list[2]
-
-        # -> second half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("2nd Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("2nd half do not exist")
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds result second half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-
-            result_odds_list = self.__scrap_average_values_list(soup)
-
-            match["SHHO"] = result_odds_list[0]
-            match["SHDO"] = result_odds_list[1]
-            match["SHAO"] = result_odds_list[2]
-
-        # get goals odds
-        # -> full time odds
-        self.__chrome_driver.find_element_by_xpath('//*[@title="Over/Under"]').click()
-        try:
-            myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        except TimeoutException:
-            print("Loading odds goals full time page took too much time!")
-        soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-        full_time_odds = self.__scrap_odds_goals_part(soup)
-
-        match["FTO 0.5"] = full_time_odds["O_U 0.5"]["OVER"]
-        match["FTU 0.5"] = full_time_odds["O_U 0.5"]["UNDER"]
-        match["FTO 1.5"] = full_time_odds["O_U 1.5"]["OVER"]
-        match["FTU 1.5"] = full_time_odds["O_U 1.5"]["UNDER"]
-        match["FTO 2.5"] = full_time_odds["O_U 2.5"]["OVER"]
-        match["FTU 2.5"] = full_time_odds["O_U 2.5"]["UNDER"]
-        match["FTO 3.5"] = full_time_odds["O_U 3.5"]["OVER"]
-        match["FTU 3.5"] = full_time_odds["O_U 3.5"]["UNDER"]
-
-        # -> first half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("1st Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("1st half do not exist")
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds goals first half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-            first_half_odds = self.__scrap_odds_goals_part(soup)
-
-            match["FHO 0.5"] = first_half_odds["O_U 0.5"]["OVER"]
-            match["FHU 0.5"] = first_half_odds["O_U 0.5"]["UNDER"]
-            match["FHO 1.5"] = first_half_odds["O_U 1.5"]["OVER"]
-            match["FHU 1.5"] = first_half_odds["O_U 1.5"]["UNDER"]
-            match["FHO 2.5"] = first_half_odds["O_U 2.5"]["OVER"]
-            match["FHU 2.5"] = first_half_odds["O_U 2.5"]["UNDER"]
-
-        # -> second half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("2nd Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("2nd half do not exist")
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds goals second half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-            second_half_odds = self.__scrap_odds_goals_part(soup)
-
-            match["SHO 0.5"] = second_half_odds["O_U 0.5"]["OVER"]
-            match["SHU 0.5"] = second_half_odds["O_U 0.5"]["UNDER"]
-            match["SHO 1.5"] = second_half_odds["O_U 1.5"]["OVER"]
-            match["SHU 1.5"] = second_half_odds["O_U 1.5"]["UNDER"]
-            match["SHO 2.5"] = second_half_odds["O_U 2.5"]["OVER"]
-            match["SHU 2.5"] = second_half_odds["O_U 2.5"]["UNDER"]
-
-        # Draw no bet
-        # -> full time odds
-        self.__chrome_driver.find_element_by_link_text("DNB").click()
-        try:
-            myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-        except TimeoutException:
-            print("Loading odds no draw page took too much time!")
-
-        soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-        draw_no_bet_odds_list = self.__scrap_average_values_list(soup)
-        match["FTNDH"] = draw_no_bet_odds_list[0]
-        match["FTNDA"] = draw_no_bet_odds_list[1]
-
-        # first half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("1st Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("1st half do not exist")
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds no draw first half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-
-            draw_no_bet_odds_list = self.__scrap_average_values_list(soup)
-            match["FHNDH"] = draw_no_bet_odds_list[0]
-            match["FHNDA"] = draw_no_bet_odds_list[1]
-
-        # second half odds
-        try:
-            self.__chrome_driver.find_element_by_link_text("2nd Half").click()
-        except selenium.common.exceptions.NoSuchElementException:
-            print("2nd half do not exist")
-
-        else:
-            try:
-                myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
-            except TimeoutException:
-                print("Loading odds no draw second half page took too much time!")
-            soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
-
-            draw_no_bet_odds_list = self.__scrap_average_values_list(soup)
-            match["SHNDH"] = draw_no_bet_odds_list[0]
-            match["SHNDA"] = draw_no_bet_odds_list[1]
 
         self.__current_match += 1
         print("Year: {}, Match: {}".format(self.__current_year, self.__current_match))
@@ -383,53 +169,13 @@ class OddsPortal:
                 result_odds_list.append(0)
         return result_odds_list
 
-    def __scrap_odds_goals_part(self, soup):
-        odds_data_list_soup = soup.find("div", id="odds-data-table").findAll("div", class_="table-container")
-
-        odds_05_div, odds_15_div, odds_25_div, odds_35_div = "", "", "", ""
-
-        for div in odds_data_list_soup:
-            if "Over/Under +0.5" in str(div):
-                odds_05_div = div
-            elif "Over/Under +1.5" in str(div):
-                odds_15_div = div
-            elif "Over/Under +2.5" in str(div):
-                odds_25_div = div
-            elif "Over/Under +3.5" in str(div):
-                odds_35_div = div
-
-        return {
-            "O_U 0.5": self.__scrap_odds_over_under(odds_05_div),
-            "O_U 1.5": self.__scrap_odds_over_under(odds_15_div),
-            "O_U 2.5": self.__scrap_odds_over_under(odds_25_div),
-            "O_U 3.5": self.__scrap_odds_over_under(odds_35_div)
-        }
-
-
-    @staticmethod
-    def __scrap_odds_over_under(odds_goals_div):
-        odds_over_under_span_list = odds_goals_div.findAll("span", class_="avg chunk-odd nowrp")
-        odds_dict = {"OVER": 0.0, "UNDER": 0.0}
-        try:
-            odds_dict = {
-                "OVER": float(odds_over_under_span_list[1].find("a").get_text()),
-                "UNDER": float(odds_over_under_span_list[0].find("a").get_text())
-            }
-        except (ValueError, AttributeError):
-            print("Failed scrapping odds over/under")
-        return odds_dict
-
     def create_wb(self):
 
         cols_names = [
             "HT", "AT",
             "DAY", "MONTH", "YEAR",
-            "FTHG", "FTAG", "FHHG", "FHAG", "SHHG", "SHAG",
-            "FTHO", "FTDO", "FTAO", "FHHO", "FHDO", "FHAO", "SHHO", "SHDO", "SHAO",
-            "FTO 0.5", "FTU 0.5", "FTO 1.5", "FTU 1.5", "FTO 2.5", "FTU 2.5", "FTO 3.5", "FTU 3.5",
-            "FHO 0.5", "FHU 0.5", "FHO 1.5", "FHU 1.5", "FHO 2.5", "FHU 2.5",
-            "SHO 0.5", "SHU 0.5", "SHO 1.5", "SHU 1.5", "SHO 2.5", "SHU 2.5",
-            "FTNDH", "FTNDA", "FHNDH", "FHNDA", "SHNDH", "SHNDA"
+            "FTHG", "FTAG",
+            "FTHO", "FTDO", "FTAO",
         ]
 
         wb = openpyxl.Workbook()
