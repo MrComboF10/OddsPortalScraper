@@ -26,19 +26,13 @@ class OddsPortal:
         self.__delay = 10
 
         self.__wb = openpyxl.Workbook()
+        self.__wb_name = ""
         self.__ws = self.__wb.active
-        self.__ws.title = ""
 
     def close(self):
         self.__chrome_driver.close()
 
-    def load(self, sport, country, league, year):
-        self.__sport = sport
-        self.__country = country
-        self.__league = league
-        self.__year = year
-
-    def load_file(self):
+    def load(self):
 
         with open(self.__config_path) as f:
             config = json.load(f)
@@ -46,32 +40,34 @@ class OddsPortal:
             self.__country = config["country"]
             self.__league = config["league"]
             self.__year = config["year"]
-            self.__ws.title = config["year"]
+            self.__ws.title = str(config["year"])
+            self.__wb_name = f'{config["sport"]}_{config["league"]}_{config["year"]}_{config["year"]+1}.xlsx'
+            self.__create_ws_columns()
 
     def __create_ws_columns(self):
 
-        cols_names = [
+        columns = [
             "HT", "AT",
             "DAY", "MONTH", "YEAR",
-            "FTHG", "FTAG",
-            "FTHO", "FTDO", "FTAO",
+            "HG", "AG",
+            "HO", "DO", "AO",
         ]
 
         col = 1
-        for name in cols_names:
-            if not (name == "FTDO" and self.__sport == "basketball"):  # basketball draws odds are not relevant
+        for name in columns:
+            if not (name == "DO" and self.__sport == "basketball"):  # basketball draws odds are not relevant
                 self.__ws.cell(row=1, column=col, value=name)
-            col += 1
+                col += 1
+
+        self.__wb.save(self.__wb_name)
 
     def scrap_season(self):
 
         page = 1
-
         while True:
             if self.__scrap_page(page) == "END_OF_PAGES":
                 break
-            else:
-                page += 1
+            page += 1
 
     def __scrap_page(self, page):
         url = "https://www.oddsportal.com/{}/{}/{}-{}-{}/results/#/page/{}/".format(self.__sport, self.__country, self.__league, self.__year, self.__year + 1, page)
@@ -99,21 +95,6 @@ class OddsPortal:
         return table.find(id="emptyMsg") is not None
 
     def __scrap_match(self, game_url):
-        match = {
-            "HT": "",  # HomeTeam
-            "AT": "",  # AwayTeam
-
-            "DAY": 0,    # Game day
-            "MONTH": 0,  # Game Month
-            "YEAR": 0,   # Game Year
-
-            "FTHG": 0,  # Final_Time_Home_Goals
-            "FTAG": 0,  # Final_Time_Away_Goals
-
-            "FTHO": 0,  # Final_Time_Home_Team_Winning_Odd
-            "FTDO": 0,  # Final_Time_Draw_Odd
-            "FTAO": 0,  # Final_Time_Away_Team_Winning_Odd
-        }
 
         self.__chrome_driver.get(game_url)
         try:
@@ -127,58 +108,81 @@ class OddsPortal:
         # get team names
         teams_names = soup.find("div", id="col-content").find("h1").get_text().split(" - ")
         home_team = teams_names[0]
-        match["HT"] = home_team
-        self.__ws.cell(row=self.__ws_row, column="HT", value=home_team)
+        self.__ws.cell(row=self.__ws_row, column=1, value=home_team)
         away_team = teams_names[1]
-        match["AT"] = away_team
-        self.__ws.cell(row=self.__ws_row, column="AT", value=away_team)
+        self.__ws.cell(row=self.__ws_row, column=2, value=away_team)
 
         # get match date
         date_list = soup.find("div", id="col-content").find("p", class_="date").get_text().replace(",", " ").split()
         try:
             day = int(date_list[1])
-            match["DAY"] = day
-            self.__ws.cell(row=self.__ws_row, column="DAY", value=day)
+            self.__ws.cell(row=self.__ws_row, column=3, value=day)
 
             month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].index(date_list[2]) + 1
-            match["MONTH"] = month
-            self.__ws.cell(row=self.__ws_row, column="MONTH", value=month)
+            self.__ws.cell(row=self.__ws_row, column=4, value=month)
 
-            match["YEAR"] = int(date_list[3])
+            year = int(date_list[3])
+            self.__ws.cell(row=self.__ws_row, column=5, value=year)
         except ValueError:
             print("Failed scrapping date")
-            match["DAY"] = 0
-            match["MONTH"] = 0
-            match["YEAR"] = 0
+            self.__ws.cell(row=self.__ws_row, column=3, value=-1)
+            self.__ws.cell(row=self.__ws_row, column=4, value=-1)
+            self.__ws.cell(row=self.__ws_row, column=5, value=-1)
 
         # get number goals
         goals_soup = soup.find("div", id="event-status").find("p", {"class": "result"})
         final_goals_str_list = goals_soup.find("strong").get_text().split(":")
 
         try:
-            match["FTHG"] = int(final_goals_str_list[0])
+            home_goals = int(final_goals_str_list[0])
+            self.__ws.cell(row=self.__ws_row, column=6, value=home_goals)
+
         except ValueError:
             print("Failed scrapping final time home goals")
+            self.__ws.cell(row=self.__ws_row, column=6, value=-1)
         try:
-            match["FTAG"] = int(final_goals_str_list[1])
+            away_goals = int(final_goals_str_list[1])
+            self.__ws.cell(row=self.__ws_row, column=7, value=away_goals)
         except ValueError:
             print("Failed scrapping final time away goals")
+            self.__ws.cell(row=self.__ws_row, column=7, value=-1)
 
         # get result odds
-        result_odds_list = self.__scrap_average_values_list(soup)
+        if self.__sport == "soccer":
+            self.__scrap_soccer_odds(soup)
+        elif self.__sport == "basketball":
+            self.__scrap_basketball_odds(soup)
+        else:
+            print("Invalid sport")
 
-        match["FTHO"] = result_odds_list[0]
-        match["FTDO"] = result_odds_list[1]
-        match["FTAO"] = result_odds_list[2]
+        self.__ws_row += 1
+        print("Match: {}".format(self.__ws_row))
+        self.__wb.save(self.__wb_name)
 
-        self.__current_match += 1
-        print("Year: {}, Match: {}".format(self.__current_year, self.__current_match))
-        print(match)
-        return list(match.values())
+    def __scrap_soccer_odds(self, soup):
+        odds = self.__scrap_odds(soup)
+
+        home_odd = odds[0]
+        self.__ws.cell(row=self.__ws_row, column=8, value=home_odd)
+
+        draw_odd = odds[1]
+        self.__ws.cell(row=self.__ws_row, column=9, value=draw_odd)
+
+        away_odd = odds[2]
+        self.__ws.cell(row=self.__ws_row, column=10, value=away_odd)
+
+    def __scrap_basketball_odds(self, soup):
+        odds = self.__scrap_odds(soup)
+
+        home_odd = odds[0]
+        self.__ws.cell(row=self.__ws_row, column=8, value=home_odd)
+
+        away_odd = odds[1]
+        self.__ws.cell(row=self.__ws_row, column=9, value=away_odd)
 
 
     @staticmethod
-    def __scrap_average_values_list(soup):
+    def __scrap_odds(soup):
         result_odds_soup_list = soup.find("div", id="odds-data-table").find("div", {"class": "table-container"}).find("table").find("tfoot").find("tr", {"class": "aver"}).findAll("td", {"class": "right"})
         result_odds_list = []
         for odd_soup in result_odds_soup_list:
@@ -186,44 +190,6 @@ class OddsPortal:
                 result_odds_list.append(float(odd_soup.get_text()))
             except (ValueError, AttributeError):
                 print("Failed scrapping odds average")
-                result_odds_list.append(0)
+                result_odds_list.append(-1)
         return result_odds_list
 
-    def create_wb(self):
-
-        cols_names = [
-            "HT", "AT",
-            "DAY", "MONTH", "YEAR",
-            "FTHG", "FTAG",
-            "FTHO", "FTDO", "FTAO",
-        ]
-
-        wb = openpyxl.Workbook()
-        current_ws = wb.active
-
-        first_season = True
-
-        for season in self.__seasons:
-
-            if first_season:
-                first_season = False
-                current_ws.title = season["Year"]
-            else:
-                current_ws = wb.create_sheet(season["Year"])
-
-            current_column = 1
-            for name in cols_names:
-                current_ws.cell(row=1, column=current_column, value=name)
-                current_column += 1
-
-            current_row = 2
-            current_column = 1
-            for match in season["Matches"]:
-                for key in match:
-                    current_ws.cell(row=current_row, column=current_column, value=key)
-                    current_column += 1
-                current_row += 1
-                current_column = 1
-
-        wb.save(self.__wb_name)
-        wb.close()
