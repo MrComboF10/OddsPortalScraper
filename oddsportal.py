@@ -23,7 +23,7 @@ class OddsPortal:
         self.__ws_row = 2
 
         self.__chrome_driver = webdriver.Chrome("C:\\Users\\pcost\\chromedriver_win32\\chromedriver.exe")
-        self.__delay = 10
+        self.__delay = 60
 
         self.__wb = openpyxl.Workbook()
         self.__wb_name = ""
@@ -129,22 +129,27 @@ class OddsPortal:
             self.__ws.cell(row=self.__ws_row, column=4, value=-1)
             self.__ws.cell(row=self.__ws_row, column=5, value=-1)
 
-        # get number goals
-        goals_soup = soup.find("div", id="event-status").find("p", {"class": "result"})
-        final_goals_str_list = goals_soup.find("strong").get_text().split(":")
-
         try:
-            home_goals = int(final_goals_str_list[0])
+            # get number goals
+            final_result_soup = soup.find("div", id="event-status").find("p")
+
+            if final_result_soup.find("span").get_text() == "Canceled":
+                print("Game Canceled!")
+                return
+
+            final_result_str = final_result_soup.find("strong").get_text()
+
+            if 'OT' in final_result_str:
+                goals_str = final_result_str[final_result_str.index('(')+1:final_result_str.index(')')]
+            else:
+                goals_str = final_result_str
+
+            home_goals, away_goals = tuple(goals_str.split(":"))
             self.__ws.cell(row=self.__ws_row, column=6, value=home_goals)
-
-        except ValueError:
-            print("Failed scrapping final time home goals")
-            self.__ws.cell(row=self.__ws_row, column=6, value=-1)
-        try:
-            away_goals = int(final_goals_str_list[1])
             self.__ws.cell(row=self.__ws_row, column=7, value=away_goals)
         except ValueError:
-            print("Failed scrapping final time away goals")
+            print("Failed scrapping goals")
+            self.__ws.cell(row=self.__ws_row, column=6, value=-1)
             self.__ws.cell(row=self.__ws_row, column=7, value=-1)
 
         # get result odds
