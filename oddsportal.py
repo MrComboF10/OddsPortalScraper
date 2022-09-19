@@ -51,6 +51,7 @@ class OddsPortal:
             "DAY", "MONTH", "YEAR",
             "HG", "AG",
             "HO", "DO", "AO",
+            "FTO 0.5", "FTU 0.5", "FTO 1.5", "FTU 1.5", "FTO 2.5", "FTU 2.5", "FTO 3.5", "FTU 3.5",
         ]
 
         col = 1
@@ -129,8 +130,8 @@ class OddsPortal:
             self.__ws.cell(row=self.__ws_row, column=4, value=-1)
             self.__ws.cell(row=self.__ws_row, column=5, value=-1)
 
+        # get number goals
         try:
-            # get number goals
             final_result_soup = soup.find("div", id="event-status").find("p")
 
             if final_result_soup.find("span").get_text() == "Canceled":
@@ -152,9 +153,14 @@ class OddsPortal:
             self.__ws.cell(row=self.__ws_row, column=6, value=-1)
             self.__ws.cell(row=self.__ws_row, column=7, value=-1)
 
-        # get result odds
+        # get odds
         if self.__sport == "soccer":
+            # get result odds
             self.__scrap_soccer_odds(soup)
+
+            # get final time goals odds
+            self.__scrap_final_time_goals_odds()
+
         elif self.__sport == "basketball":
             self.__scrap_basketball_odds(soup)
         else:
@@ -185,6 +191,40 @@ class OddsPortal:
         away_odd = odds[1]
         self.__ws.cell(row=self.__ws_row, column=9, value=away_odd)
 
+    def __scrap_final_time_goals_odds(self):
+        self.__chrome_driver.find_element(By.XPATH, '//*[@title="Over/Under"]').click()
+        try:
+            myElem = WebDriverWait(self.__chrome_driver, self.__delay).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'table-container')))
+            print("Odds goals full time page is ready!")
+
+        except TimeoutException:
+            print("Loading odds goals full time page took too much time!")
+        soup = bs4.BeautifulSoup(self.__chrome_driver.page_source, "html.parser")
+        self.__scrap_odds_goals_part(soup)
+
+    def __scrap_odds_goals_part(self, soup):
+        odds_data_list_soup = soup.find("div", id="odds-data-table").findAll("div", class_="table-container")
+
+        for div in odds_data_list_soup:
+            if "Over/Under +0.5" in str(div):
+                self.__scrap_odds_over_under(div, 11)
+            elif "Over/Under +1.5" in str(div):
+                self.__scrap_odds_over_under(div, 13)
+            elif "Over/Under +2.5" in str(div):
+                self.__scrap_odds_over_under(div, 15)
+            elif "Over/Under +3.5" in str(div):
+                self.__scrap_odds_over_under(div, 17)
+
+    def __scrap_odds_over_under(self, odds_goals_div, col):
+        odds_over_under_span_list = odds_goals_div.findAll("span", class_="avg chunk-odd nowrp")
+        try:
+            over = float(odds_over_under_span_list[1].find("a").get_text())
+            self.__ws.cell(row=self.__ws_row, column=col, value=over)
+            under = float(odds_over_under_span_list[0].find("a").get_text())
+            self.__ws.cell(row=self.__ws_row, column=col+1, value=under)
+        except ValueError:
+            print("Odds over/under not real!")
 
     @staticmethod
     def __scrap_odds(soup):
