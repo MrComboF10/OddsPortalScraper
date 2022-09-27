@@ -223,7 +223,7 @@ class OddsPortal:
             self.__ws.cell(row=self.__ws_row, column=col, value=over)
             under = float(odds_over_under_span_list[0].find("a").get_text())
             self.__ws.cell(row=self.__ws_row, column=col+1, value=under)
-        except ValueError:
+        except (ValueError, AttributeError):
             print("Odds over/under not real!")
 
     @staticmethod
